@@ -13,8 +13,8 @@ dbname = 'bot.db'
 conn = sqlite3.connect(dbname)
 c = conn.cursor()  #DBへの接続
 
-# 自分のBotのアクセストークン
-TOKEN = 'ODE0ODk5NzI3NzkwMjQzODY1.YDkkgw.hFCrUl4vWnKwyyEVNMF_IttqP8A'
+
+TOKEN = '自分のBotのアクセストークン'
 
 # 接続に必要なオブジェクトを生成
 client = discord.Client()
