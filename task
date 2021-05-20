@@ -1,0 +1,139 @@
+import os
+import keep_alive
+import discord
+from datetime import datetime
+from discord.ext import tasks
+import sqlite3
+
+dbname = 'bot.db'
+
+conn = sqlite3.connect(dbname)
+c = conn.cursor()  #DBへの接続
+
+# 自分のBotのアクセストークン
+TOKEN = 'ODMzOTU2NDM5ODQ0MTkyMjg3.YH54dQ.llFsTPzX521jZi8KrAxiBft3oz8'
+
+# 接続に必要なオブジェクトを生成
+client = discord.Client()
+
+#table削除
+c.execute("DROP TABLE IF EXISTS 'tasks'")
+conn.commit()
+
+#table作成
+c.execute("CREATE TABLE IF NOT EXISTS 'tasks' (id value,event verchar,per verchar)")
+conn.commit()
+
+# 起動時に動作する処理
+@client.event
+async def on_ready():
+	print('ready')
+
+channel = 833974620779839498
+
+# メッセージ受信時に動作する処理
+@client.event
+async def on_message(message):
+  member_mention = str(message.author.id)
+  if message.author.bot:
+    return
+  if message.channel.id != channel:
+    return
+  if message.content == '/all':
+    send_channel = client.get_channel(channel)
+    c.execute('SELECT * FROM tasks WHERE id = ?' ,(message.author.id,))
+    allevent = c.fetchall()
+    count = len(allevent)
+    for num in range(count):
+      await send_channel.send(allevent[num][1] + '\n' + '進捗率' + allevent[num][2])
+    return
+  c.execute("INSERT INTO tasks VALUES (:id, :event, :per)",
+                   {'id': member_mention,'event': message.content, 'per' : '0%'})
+  conn.commit()
+  await message.add_reaction('1⃣')
+  await message.add_reaction('2⃣')
+  await message.add_reaction('3⃣')
+  await message.add_reaction('4⃣')
+  await message.add_reaction('5⃣')
+  await message.add_reaction('6⃣')
+  await message.add_reaction('7⃣')
+  await message.add_reaction('8⃣')
+  await message.add_reaction('9⃣')
+  await message.add_reaction('🔟')
+  c.execute('SELECT * FROM tasks')
+  print(c.fetchall())
+  if message.content == '/all':
+     c.execute('SELECT * FROM tasks WHERE id = ?,member_mention')
+     print(c.fetchall())
+
+  
+#リアクションを付けられたときに走る処理
+@client.event
+async def on_reaction_add(reaction, user):
+  if user.bot:
+    return
+  send_channel = client.get_channel(channel)
+  Event = reaction.message.content
+  ID = user.id
+  print(reaction)
+  c.execute(
+		    'SELECT * FROM tasks WHERE id = ? AND event = ?' ,(ID, Event))
+  set_task = c.fetchall()
+  if reaction.emoji == ("1⃣"):
+    c.execute("update tasks set per = '10%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(Event)
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬡⬡⬡⬡⬡⬡⬡⬡⬡]10%")
+  if reaction.emoji == ("2⃣"):
+    c.execute("update tasks set per = '20%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬡⬡⬡⬡⬡⬡⬡⬡]20%")
+  if reaction.emoji == ("3⃣"):
+    c.execute("update tasks set per = '30%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬡⬡⬡⬡⬡⬡⬡]30%")
+  if reaction.emoji == ("4⃣"):
+    c.execute("update tasks set per = '40%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬡⬡⬡⬡⬡⬡]40%")
+  if reaction.emoji == ("5⃣"):
+    c.execute("update tasks set per = '50%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬢⬡⬡⬡⬡⬡]50%")
+  if reaction.emoji == ("6⃣"):
+    c.execute("update tasks set per = '60%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬢⬢⬡⬡⬡⬡]60%")
+  if reaction.emoji == ("7⃣"):
+    c.execute("update tasks set per = '70%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬢⬢⬢⬡⬡⬡]70%")
+  if reaction.emoji == ("8⃣"):
+    c.execute("update tasks set per = '80%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬢⬢⬢⬢⬡⬡]80%")
+  if reaction.emoji == ("9⃣"):
+    c.execute("update tasks set per = '90%' where event = Event")
+    c.execute('SELECT * FROM tasks')
+    print(c.fetchall())
+    await send_channel.send(set_task[0][1] + "\n" + "[⬢⬢⬢⬢⬢⬢⬢⬢⬢⬡]90%")
+  if reaction.emoji == ("🔟"):
+    embed=discord.Embed(description=set_task[0][1] + "が終了しました。データベースから削除します。")
+    await send_channel.send(embed=embed)
+    c.execute(
+		    'DELETE FROM tasks WHERE id = ? AND event = ?', (ID, Event))
+    conn.commit()
+
+  
+#Botの起動とDiscordサーバーへの接続
+keep_alive.keep_alive()
+client.run(os.getenv('TOKEN'))
+conn.close()
