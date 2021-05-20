@@ -1,0 +1,143 @@
+#ライブラリのインポート
+import requests
+from bs4 import BeautifulSoup
+import os
+import keep_alive
+import discord
+from datetime import datetime
+from pytz import timezone
+import sqlite3
+from discord.ext import tasks
+
+dbname = 'bot.db'
+
+conn = sqlite3.connect(dbname)
+c = conn.cursor()  #DBへの接続
+
+
+TOKEN = '#自分のBotのアクセストークン'
+
+# 接続に必要なオブジェクトを生成
+client = discord.Client()
+
+#table削除
+#c.execute("DROP TABLE IF EXISTS 'transfer_alarm'")
+#conn.commit()
+
+#table作成
+c.execute("CREATE TABLE IF NOT EXISTS 'transfer_alarm' (id value,time verchar,event verchar)")
+conn.commit()
+
+
+# 起動時に動作する処理
+@client.event
+async def on_ready():
+    print('ready')
+'''
+######test######################
+c.execute("INSERT INTO transfer_alarm VALUES (:id, :time, :event)",(352075004193800193,'2021年04月03日1:10','発'))
+conn.commit()
+c.execute("INSERT INTO transfer_alarm VALUES (:id, :time, :event)",(542265506443427851,'2021年04月03日1:10','発'))
+conn.commit()
+c.execute('SELECT * FROM transfer_alarm')
+print(c.fetchall())
+######test######################
+'''
+
+
+# メッセージ受信時に動作する処理
+#https://www.navitime.co.jp/transfer/searchlist?orvStationName=%E6%A1%9C%E6%9C%A8%E7%94%BA&dnvStationName=%E6%A8%AA%E6%B5%9C&thrStationName1=&thrStationCode1=&thrStationName2=&thrStationCode2=&thrStationName3=&thrStationCode3=&month=2021%2F3&day=31&hour=1&minute=29&orvStationCode=&dnvStationCode=00000838&basis=4&from=view.transfer.searchlist&freePass=0&sort=0&wspeed=100&airplane=1&sprexprs=1&utrexprs=1&othexprs=1&mtrplbus=1&intercitybus=1&ferry=1&accidentRailCode=&accidentRailName=&isrec=#detail_route_0
+@client.event
+async def on_message(message):
+  usechannel = message.channel.id
+  member_mention = message.author.id
+  url = message.content
+  PCorSP = url[-10:-1]
+  print(PCorSP)
+  #HTTPリクエスト
+  r = requests.get(url)
+  #HTMLの解析
+  bsObj = BeautifulSoup(r.content, "html.parser")
+  if message.author.bot:
+    return
+  if PCorSP == ('selectTab'):#SP版の処理
+    #乗る電車の時間を取得
+    train = bsObj.find(id=PCorSP)
+  elif PCorSP == ('il_route_'):#PC版の処理
+    #日付を取得
+    day = bsObj.find(class_ = 'search_time').string
+    day2 = day[:11]
+    print(day2)
+
+    #乗る電車の時間を取得
+    PC = url[-14:]
+    print(PC)
+    train = bsObj.find(id=PC)
+    transfer_time = train.findAll(class_ = 'sgk_time')
+    wordlist = [x.text for x in transfer_time]
+    wordlist[0] = wordlist[0].replace('\t','')
+    wordlist[0] = wordlist[0].replace('\n','')
+    if '(直通)' in wordlist:
+      wordlist.remove('(直通)')
+    print('(直通)' in wordlist)
+    for sum in range(len(wordlist)):
+      alarmtime = (day2 + wordlist[sum][:5])
+      DorA = wordlist[sum][-1:]
+      wordlist_minutes = int(wordlist[sum][-3:-1])
+      wordlist_hours = int(wordlist[sum][0:2])
+      if wordlist_minutes == 0:
+        wordlist_hours -= 1
+        wordlist_minutes = 59
+        print(wordlist_hours)
+      else:
+        wordlist_minutes -= 1
+        alarmtime = (day2 + str(wordlist_hours) + ':' + str(wordlist_minutes))
+        print(alarmtime)
+        c.execute("INSERT INTO transfer_alarm VALUES (:id, :time, :event)",
+                   {'id': member_mention, 'time': alarmtime, 'event': DorA})
+        conn.commit()
+        c.execute('SELECT * FROM transfer_alarm')
+        test = c.fetchall()
+        print(test)
+
+  else:
+    channel = client.get_channel(usechannel)
+    await channel.send('URLが正しくありません')
+
+
+# 〇〇秒に一回ループ
+@tasks.loop(seconds=60)
+async def time_check():
+	# 現在の時刻
+  dt1 = datetime.now(timezone('Asia/Tokyo')).strftime('%Y年%m月%d日%-H:%-M')#現在時刻
+  print(dt1)
+  c.execute('SELECT * FROM transfer_alarm WHERE time = ?', (dt1, ))
+  result2 = c.fetchall()
+  num = len(result2)
+  print(num)
+  print(result2)
+  if num != 0:
+    for sum in range(num):
+      await SendMessage(dt1,result2[sum][0],result2[sum][2])
+
+
+#ループ処理
+time_check.start()
+
+# 指定時間に走る処理
+async def SendMessage(timenow, DM, DA):
+  c.execute('SELECT * FROM transfer_alarm WHERE time = ?',(timenow, ))
+  Result = c.fetchall()
+  print(Result)
+  if DA == '発':
+    user = await client.fetch_user(DM)
+    await user.send("<@" + str(DM) + "> さん まもなく電車が発車します。")
+  else:
+      user = await client.fetch_user(DM)
+      await user.send("<@" + str(DM) + "> さん まもなく電車が到着します。")
+
+
+# Botの起動とDiscordサーバーへの接続
+keep_alive.keep_alive()
+client.run(os.getenv('TOKEN'))
+conn.close()
